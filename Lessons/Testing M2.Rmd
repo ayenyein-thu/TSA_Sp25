@@ -1,0 +1,45 @@
+---
+title: "M2_Temp_Example"
+author: "Aye Nyein Thu"
+date: "2025-01-21"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r load packages}
+library(lubridate)
+library(ggplot2)
+library(forecast) #tseries is imported by 'forecast'
+library(dplyr)
+library(readxl)
+library(openxlsx)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r }
+sample <- read_excel(path="./Lessons/M2_Temp_Example_ACF_PACF.xlsx",skip = 2, sheet="Class_exercise",col_names=TRUE) 
+```
+
+
+```{r}
+temp <- c(14.2,16.4,11.9,15.2,18.5,22.1,19.4,25.1,23.4,18.1,22.6,17.2)
+temp_acf <- Acf(temp)
+temp_ts <- ts(temp)
+temp_Acf <- acf(temp_ts, lag=4)
+
+```
+
