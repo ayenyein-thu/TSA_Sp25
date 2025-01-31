@@ -2,8 +2,6 @@
 title: "M3: Class Exercise on Trend and Season"
 author: "Luana Lima"
 output: pdf_document
-editor_options: 
-  chunk_output_type: console
 ---
 
 ## Setting R code chunk options
@@ -34,7 +32,7 @@ Let's continue working with our inflow data for reservoirs in Brazil.
 ```{r}
 
 #Importing time series data from text file#
-raw_inflow_data <- read.table(file="./Data/inflowtimeseries.txt",header=FALSE,skip=0)
+raw_inflow_data <- read.table(file="../Data/inflowtimeseries.txt",header=FALSE,skip=0)
 
 #Trim the table to include only columns you need
 nhydro <- ncol(raw_inflow_data)-2
@@ -111,9 +109,7 @@ Fixed!
 Many of the functions we will use require a time series object. You can transform your data in a time series using the function *ts()*. 
 
 ```{r}
-start <-my_date[1]
-end=my_date[nobs]
-ts_inflow_data <- ts(inflow_data[,2:(2+nhydro-1)], start = c(start,end), frequency=12) 
+ts_inflow_data <- ts(inflow_data[,2:(2+nhydro-1)],start=c(1931,1),frequency=12) 
 #note that we are only transforming columns with inflow data, not the date columns  #start=my_date[1],end=my_date[nobs],
 head(ts_inflow_data,15)
 ```
@@ -140,40 +136,30 @@ for(i in 1:nhydro){
 Let's identify and remove trend component. You start by fitting a linear model to $Y_t=\beta_0+\beta_1*t+\epsilon_t$. 
 
 ```{r}
+iHP <- 1
 #Create vector t
 t <- c(1:nobs)
 
-data <- data.frame("t"=t,"HP1"=inflow_data$HP1)
-
 #Fit a linear trend to TS of iHP
-linear_trend_model=lm(HP1~t,data)
+linear_trend_model <- lm(inflow_data[,iHP+1] ~ t) # + 1 refers to date column
 summary(linear_trend_model)
 
+beta0 <- as.numeric(linear_trend_model$coefficients[1])
+beta1 <- as.numeric(linear_trend_model$coefficients[2])
+
+#detrend inflow
+linear_trend <- beta0 + beta1 * t
+ts_linear <- ts(linear_trend,star=c(1931,1),frequency=12)
+
+detrend_inflow <- inflow_data[,iHP+1] - linear_trend
+ts_detrend <- ts(detrend_inflow, start = c(1931,1),frequency = 12)
+  
+#Plot
+autoplot(ts_inflow_data[,iHP],color="darkblue")+
+  autolayer(ts_detrend,series="Detrended",color="green")+
+  autolayer(ts_linear,series="Linear Component",color="red")
+
 ```
-
-
-```{r}
-#Coefficient 
-beta0=as.numeric(linear_trend_model$coefficients[1])
-beta1=as.numeric(linear_trend_model$coefficients[2])
-
-#remove the trend from series
-detrend_linear <- inflow_data$HP1-(beta0+beta1*data$t)
-year1 <- year(inflow_data$my_date[1])
-month1 <- month(inflow_data$my_date[1])
-ts_detrend_linear <- ts(detrend_linear,start=c(year1,month1),frequency=12)
-
-#Plot 
-detrend_smooth <- original_data$Amazon.River- smooth_trend
-ts_detrend_smooth <- ts_original_data-ts_smooth_trend
-
-autoplot(ts_inflow_data, col="darkblue") +
-autolayer(ts_detrend_linear,series="Detrended Series" ) +
-ylab("Amazon River Inflow [m3/s]") +
-xlab("") +
-labs(color="")
-```
-
 Note that blue line is our original series, red line is our trend, green line is our original series minus the trend or in other words the detrended series. And in orange is the trend line for the detrended series which has slope 0 meaning we were able to effectively eliminate the trend with a linear model.
 
 
@@ -183,6 +169,10 @@ Now let's shift attention to the seasonal component.
 
 ```{r}
 #Use seasonal means model
+dummies <- seasonaldummy(ts_detrend)
+
+seas_means_model <- lm(detrend_inflow ~ dummies)
+summary(seas_means_model)
 
 
 ```
