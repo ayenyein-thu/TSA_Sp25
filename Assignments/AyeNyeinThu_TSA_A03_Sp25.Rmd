@@ -115,7 +115,7 @@ for(i in 1:2) {
   
   # Combine plots 
   combined_plot <- plot_grid(ts_plot, acf_plot, pacf_plot, nrow = 3, 
-                             align = "v")
+                             align = "v", heights)
   
   # Print the combined plots for each time series
   print(combined_plot)
