@@ -242,7 +242,7 @@ autoplot(ts_energy[,1],series="Original") +
 clean_wind_hist <- tsclean(ts_energy[,2])
 
 # Plot wind series
-autoplot(ts_energy[,2],series="Random") +
+autoplot(ts_energy[,2],series="Original") +
   autolayer(clean_wind_hist,series="Cleaned") + 
   labs(title = "Outliers in Wind Energy Series [With Historical Data]")
 ```
@@ -266,7 +266,7 @@ autoplot(ts_energy_2012[,1],series="Original") +
 clean_wind_2012 <- tsclean(ts_energy_2012[,2])
 
 # Plot wind series
-autoplot(ts_energy_2012[,2],series="Random") +
+autoplot(ts_energy_2012[,2],series="Original") +
   autolayer(clean_wind_2012,series="Cleaned") + 
   labs(title = "Outliers in Wind Energy Series [Without Historical Data]")
 
