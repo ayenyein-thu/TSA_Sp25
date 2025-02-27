@@ -127,12 +127,11 @@ The ACF and PACF from the seasonal adjusted series will help you specify compone
 ```{r}
 
 #Creating non-seasonal residential price time series
-deseasonal_residential_price <- seasadj(decompose_residential_price)
+deseasonal_residential_price <- 
   
 
 #Plotting original and deseasoned series
-autoplot(ts_electricity_price[,"Residential"], series = "Original") + 
-  autolayer(deseasonal_residential_price)
+autoplot()
 
 
 
