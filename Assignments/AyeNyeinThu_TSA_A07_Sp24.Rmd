@@ -63,39 +63,53 @@ ts_netgen <- ts(netgen_cleaned$Natural_gas,
                            start=c(year(netgen_cleaned$Month[1]),
                                    month(netgen_cleaned$Month[1])),
                            frequency=12) 
-# Plot ACF and PACF 
+
+# Plot time series, ACF and PACF 
+ggplot(netgen_cleaned, aes(x=Month, y=Natural_gas)) +
+  geom_line() + 
+  ylab("Natural Gas (thousand megawatthours)") + 
+  ggtitle ("Net Generation of Natural Gas over Time") 
+
 par(mfrow=c(1,2))
+ACF_Plot <- Acf(ts_netgen, lag = 60, plot = TRUE)
+PACF_Plot <- Pacf(ts_netgen, lag = 60)
 
-ACF_Plot <- Acf(ts_netgen, lag = 40, plot = TRUE)
-PACF_Plot <- Pacf(ts_netgen, lag = 40)
-
-# Plot ACF and PACF 
-plot_grid(
-  autoplot(ts_netgen), 
-  autoplot(Acf(ts_netgen,lag.max=40, plot = FALSE)),  
-  autoplot(Pacf(ts_netgen,lag.max=40, plot = FALSE)),
-  nrow=1
-)
 ```
 
 ### Q2
 
 Using the $decompose()$ and the $seasadj()$ functions create a series without the seasonal component, i.e., a deseasonalized natural gas series. Plot the deseasonalized series over time and corresponding ACF and PACF. Compare with the plots obtained in Q1.
 
-```{r deseasoned, , warning=FALSE, message=FALSE}
+```{r deseasoned, warning=FALSE, message=FALSE}
 # Decompose the series
 decompose_netgen <- decompose(ts_netgen, "additive")
+plot(decompose_netgen)
   
-# Deseasonalized the series 
+# Deseason the series
 deseason_netgen <- seasadj(decompose_netgen)
+
+# Plot original and deseasoned series
+autoplot(ts_netgen, series="Original") +
+  autolayer(deseason_netgen, series="Deseasoned") +
+  xlab("Year") + ylab("Natural Gas (thousand megawatthours)") +
+  ggtitle("Net Generation of Natural Gas over Time")
   
-# Plot the series 
+# Compare ACFs
 plot_grid(
-  autoplot(deseason_netgen),
-  autoplot(Acf(deseason_netgen,lag.max=40, plot = FALSE)),  
-  autoplot(Pacf(deseason_netgen,lag.max=40, plot = FALSE)),
-  nrow=1
+  autoplot(Acf(ts_netgen, lag = 40, plot=FALSE), 
+                main = "Original Series") , 
+  autoplot(Acf(deseason_netgen, lag = 40, plot=FALSE),  
+                  main = "Deseasoned Series")
 )
+
+# Compare PACFs 
+plot_grid(
+  autoplot(Pacf(ts_netgen, lag = 40, plot=FALSE), 
+                main = "Original Series") , 
+  autoplot(Pacf(deseason_netgen, lag = 40, plot=FALSE),  
+                  main = "Deseasoned Series")
+)
+
 ```
 
 > Answer: In the original series, both ACF and PACF plots exhibits the existence of seasonality. The ACF plots has the regular seasonality-like features and spikes in 12, 24 and 36 while PACF also showcases the similar spikes behaviors. After deseasoning the series, the seasonality features have now been removed as there is not regular spikes in both ACF and PACF plots after deasonalization. The ACF plot shows the trend behavior. 
@@ -108,43 +122,110 @@ Run the ADF test and Mann Kendall test on the deseasonalized data from Q2. Repor
 
 ```{r model the deseasonalized series, warning=FALSE, message=FALSE}
 # Run the ADF test
-summary(MannKendall(deseason_netgen))
+print(adf.test(deseason_netgen, alternative = "stationary")) 
 
 # Run the Mann Kendall Test 
-print(adf.test(deseason_netgen, alternative = "stationary")) 
+summary(MannKendall(deseason_netgen))
 ```
 
-> Answer: The Mann Kendall test result indicates that the deseasonalized series of net natural gas generation has a very strong increasing trend at tau value of 0.84. As the p-value is very small, the result is statistically significant at 1% level. 
-The Augmented Dickey-Fuller (ADF) test shows that the deseasonalized series has a ADF value at -4.03 and p-value at 0.01. Since the p-value is lower than 0.05, we have enough evidence to reject the null hypothesis that suggests the deseasonalized series is a unit root or stochastic trend. Therefore, the deseasonalized series is stationary. 
+> Answer: The Augmented Dickey-Fuller (ADF) test shows that the deseasonalized series has a ADF value at -4.03 and p-value at 0.01. Since the p-value is lower than 0.05, we have enough evidence to reject the null hypothesis that suggests the deseasonalized series is a unit root or stochastic trend. 
+The Mann Kendall test result indicates that the deseasonalized series of net natural gas generation has a very strong increasing trend at tau value of 0.84. As the p-value is very small, the result is statistically significant at 1% level. 
 
 ### Q4
 
 Using the plots from Q2 and test results from Q3 identify the ARIMA model parameters $p,d$ and $q$. Note that in this case because you removed the seasonal component prior to identifying the model you don't need to worry about seasonal component. Clearly state your criteria and any additional function in R you might use. DO NOT use the $auto.arima()$ function. You will be evaluated on ability to understand the ACF/PACF plots and interpret the test results.
 
-> Answer: Using the plots in Q2, the parameters of the manual ARIMA model would be p = 1, d = 0 and q = 0. We assume that the order of non-seasonal AR is 1 since the ACF plot shows a strong autocorrelation and significant decaying behavior; and the PACF shows a clear cut-off due to spike at lag 1 and goes down thereafter. The desesonalized series therefore is a strong AR. As we do not see any cut-off in ACF plot, we assume that q = 0. Although the deasonalized series and ACF plots show an upward trend that might not be stationary, the ADF test indicates that the series is stationary. We will take the test result and assume that q = 0 as we do not need to difference the stationary series. But it is also necessary to note down the d could also be 1. 
+```{r identifying parameters, warning=FALSE, message=FALSE}
+# Find no. of time to difference
+n_diff <- ndiffs(deseason_netgen)
+cat("Number of non-seasonal differencing needed: ",n_diff)
+
+# Therefore, we will assume that d = 1. 
+
+# Create the differenced series 
+diff_deseason_netgen <- diff(deseason_netgen,differences=1,lag=1)
+
+# Plot original, deseasoned and differenced/ deaseasoned series
+autoplot(ts_netgen, series = "Original") +
+  autolayer(deseason_netgen, series = "Deseasoned") +
+  autolayer(diff_deseason_netgen, series = "Diff/Deseasoned") +
+  xlab("Year") +
+  ylab("Natural Gas (thousand megawatthours)") +
+  ggtitle("Net Generation of Natural Gas over Time")
+
+# Compare ACFs
+plot_grid(
+  autoplot(Acf(ts_netgen, lag = 40, plot=FALSE), 
+                main = "Original Series") , 
+  autoplot(Acf(deseason_netgen, lag = 40, plot=FALSE),  
+                  main = "Deseasoned Series") , 
+  autoplot(Acf(diff_deseason_netgen, lag = 40, plot=FALSE),  
+                  main = "Diff/Deseasoned Series"), 
+  nrow = 1 
+)
+
+# Compare PACFs 
+plot_grid(
+  autoplot(Pacf(ts_netgen, lag = 40, plot=FALSE), 
+                main = "Original Series") , 
+  autoplot(Pacf(deseason_netgen, lag = 40, plot=FALSE),  
+                  main = "Deseasoned Series") , 
+  autoplot(Pacf(diff_deseason_netgen, lag = 40, plot=FALSE),  
+                  main = "Diff/Deseasoned Series"), 
+  nrow = 1 
+)
+
+# Plot the differenced series together
+plot_grid(
+  autoplot(Acf(diff_deseason_netgen, lag = 60, plot=FALSE),  
+                  main = "Diff/Deseasoned Series"), 
+  autoplot(Pacf(diff_deseason_netgen, lag = 60, plot=FALSE),  
+                  main = "Diff/Deseasoned Series"), 
+  nrow = 1 
+)
+
+```
+
+> Comment: Although we know that d = 1 using "diff" function, both ACF and PACF plots do not have a clear and sharp cut-offs. For instance, in the ACF plots, q could also be 1 or 2. At the same time, in the PACF plot, p could also be 1 or 2. Therefore, we will continue with running both models manually. 
 
 ### Q5
 
 Use `Arima()` from package "forecast" to fit an ARIMA model to your series considering the order estimated in Q4. You should allow constants in the model, i.e., `include.mean = TRUE` or `include.drift=TRUE`. **Print the coefficients** in your report. Hint: use the `cat()` or `print()` function to print.
 
-```{r manual ARIMA}
-manual_ARIMA <- Arima(deseason_netgen,
-                       order=c(1,0,0),
-                       include.drift=TRUE)
+```{r nonseasonal ARIMA, warning=FALSE, message=FALSE}
+# Find the possible models 
+nonseasonal_111 <- Arima(deseason_netgen,order=c(1,1,1))
+print(nonseasonal_111)
+compare_aic <- data.frame(nonseasonal_111$aic)
 
-print(manual_ARIMA)
+nonseasonal_112 <- Arima(deseason_netgen,order=c(1,1,2))
+print(nonseasonal_112)
+compare_aic <- data.frame(compare_aic,nonseasonal_112$aic)
+
+nonseasonal_211 <- Arima(deseason_netgen,order=c(2,1,1))
+print(nonseasonal_211)
+compare_aic <- data.frame(compare_aic,nonseasonal_211$aic)
+
+nonseasonal_212 <- Arima(deseason_netgen,order=c(2,1,2))
+print(nonseasonal_212)
+compare_aic <- data.frame(compare_aic,nonseasonal_212$aic)
+
+print(compare_aic)
+
 ```
+
+> Answer: As per the AIC results, the best fit model is the ARIMA(1,1,1). Therefore, the combination of stationary tests, ACF and PACF plots and further trial and error model testing indicates that the ARIMA model with p=1, d=1 and q=1 are the best possible alternative. 
 
 ### Q6
 
 Now plot the residuals of the ARIMA fit from Q5 along with residuals ACF and PACF on the same window. You may use the $checkresiduals()$ function to automatically generate the three plots. Do the residual series look like a white noise series? Why?
 
-```{r ARIMA residuals plot}
-checkresiduals(manual_ARIMA)
+```{r ARIMA residuals plot, warning=FALSE, message=FALSE}
+# Plot the residuals of the manual nonseasonal ARIMA model 
+checkresiduals(nonseasonal_111)
 ```
 
-> Answer: The residuals plot of the deseasonalized series seem to be random as there is no clear trends or regular spikes. The ACF plot also shows that most of the correlation lines are within the blue line and looks random. The residuals distribution also showcases a normal distribution. Therefore, we could assume that it exhibits a white noise series. 
-
+> Answer: The residuals plot of the deseasonalized series seem to be random as there is no clear trends or regular spikes. Despite a few spikes, most of the correlation lines in the ACF plot are within the blue line and looks random. The residuals distribution also showcases a normal distribution. Therefore, we could assume that it exhibits a white noise series. 
 
 ## Modeling the original series (with seasonality)
 
@@ -152,43 +233,107 @@ checkresiduals(manual_ARIMA)
 
 Repeat Q3-Q6 for the original series (the complete series that has the seasonal component). Note that when you model the seasonal series, you need to specify the seasonal part of the ARIMA model as well, i.e., $P$, $D$ and $Q$.
 
-```{r seasonal ARIMA}
+```{r seasonal ARIMA, warning=FALSE, message=FALSE}
 # Run the ADF test
-summary(MannKendall(ts_netgen))
-
-# Run the Mann Kendall Test 
 print(adf.test(ts_netgen, alternative = "stationary")) 
 
-# Redo the plot for quick check 
-# Plot ACF and PACF 
+# Run the Mann Kendall Test 
+summary(SeasonalMannKendall(ts_netgen))
+
+# Find no. of time to difference
+ns_diff <- ndiffs(ts_netgen)
+cat("Number of seasonal differencing needed: ",n_diff)
+
+# Therefore, we will assume that D = 1. 
+
+# Create the differenced series 
+trend_diff_netgen <- diff(ts_netgen,lag =1, differences=1)
+trendseas_diff_netgen <- diff(trend_diff_netgen,lag =12, differences=1)
+
+# Plot original, deseasoned and trend/ seasonal differenced series
+autoplot(ts_netgen, series = "Original") +
+  autolayer(deseason_netgen, series = "Deseasoned") +
+  autolayer(diff_deseason_netgen, series = "Diff/Deseasoned") + 
+  autolayer(trendseas_diff_netgen, series = "Trend/Seasonal Differenced") +
+  xlab("Year") +
+  ylab("Natural Gas (thousand megawatthours)") +
+  ggtitle("Net Generation of Natural Gas over Time")
+
+# Compare ACFs
 plot_grid(
-  autoplot(ts_netgen), 
-  autoplot(Acf(ts_netgen,lag.max=40, plot = FALSE)),  
-  autoplot(Pacf(ts_netgen,lag.max=40, plot = FALSE)),
-  nrow=1
+  autoplot(Acf(ts_netgen, lag = 40, plot=FALSE), 
+                main = "Original Series") , 
+  autoplot(Acf(deseason_netgen, lag = 40, plot=FALSE),  
+                  main = "Deseasoned Series") , 
+  autoplot(Acf(diff_deseason_netgen, lag = 40, plot=FALSE),  
+                  main = "Diff/Deseasoned Series"), 
+  autoplot(Acf(trendseas_diff_netgen, lag = 40, plot=FALSE),  
+                  main = "Trend/Seasonal Differenced Series"), 
+  nrow = 1 
 )
 
-# Specify the model parameters 
-# Non-seasonal part 
-# p = 1 (We could see a clear cut-off in the PACF plot at lag 1 and the ACF plot shows a strong long memory excluding seasonality behaviors.)
-# d = 0 (We assume d = 0 as the ADF test shows it is stationary.)
-# q = 0 (We assume q = 0 since there is no clear cut-off seen in ACF plot before the seasonality behavior.)
+# Compare PACFs 
+plot_grid(
+  autoplot(Pacf(ts_netgen, lag = 40, plot=FALSE), 
+                main = "Original Series") , 
+  autoplot(Pacf(deseason_netgen, lag = 40, plot=FALSE),  
+                  main = "Deseasoned Series") , 
+  autoplot(Pacf(diff_deseason_netgen, lag = 40, plot=FALSE),  
+                  main = "Diff/Deseasoned Series"), 
+  autoplot(Pacf(trendseas_diff_netgen, lag = 40, plot=FALSE),  
+                  main = "Trend/Seasonal Differenced Series"), 
+  nrow = 1 
+)
 
-# Seasonal part 
-# P = 1 (We assume P = 1 due the single spike at seasonal lags in the PACF plot.)
-# D = 0 (We assume D = 0 since the ADF test is stationary.)
-# Q = 0 (We assume Q = 0 due to the multiple spikes at seasonal lags in ACF plot which is the prominent feature of AR model.)
+# Plot the differenced series together
+plot_grid(
+  autoplot(Acf(trendseas_diff_netgen, lag = 60, plot=FALSE),  
+                  main = "Diff/Deseasoned Series"), 
+  autoplot(Pacf(trendseas_diff_netgen, lag = 60, plot=FALSE),  
+                  main = "Diff/Deseasoned Series"), 
+  nrow = 1 
+)
+
+# Find the possible models 
+seasonal_111011 <- Arima(ts_netgen,
+                       order=c(1,1,1),
+                       seasonal=c(0,1,1),
+                       include.drift=FALSE)
+print(seasonal_111011)
+compare_aic <- data.frame(compare_aic, seasonal_111011$aic)
+
+seasonal_111110 <- Arima(ts_netgen,
+                       order=c(1,1,1),
+                       seasonal=c(1,1,0),
+                       include.drift=FALSE)
+print(seasonal_111110)
+compare_aic <- data.frame(compare_aic, seasonal_111110$aic)
+
+print(compare_aic)
+
+# Plot the residuals of the manual nonseasonal ARIMA model 
+checkresiduals(seasonal_111011)
+
 ```
 
+> Comment: Similar to the non-seasonal parameters identification, D = 1 with the use of "ndiffs" function. As the ACF plot shows only one single spike at lag 12 while PACF plot shows multiple spikes at lag 12, 24, 36, it is more likely to be Seasonal MA (SMA) process. Since we should use P + Q is not more than 1 at a time and the plots show it is more likely to be SMA process, we will assume that P=0, D=1 and Q=1 in the seasonal ARIMA model. We will reuse p=1, d=1 and q=1 from the previous nonseasonal model. But we will also add the option with P=, D=1 and Q=0 to compare.  
+As per the AIC comparison table, ACF and PACF plots values, SARIMA model(111011) is the best fit with lowest AIC value. The residuals also look random. 
 
 ### Q8
 
 Compare the residual series for Q7 and Q6. Can you tell which ARIMA model is better representing the Natural Gas Series? Is that a fair comparison? Explain your response.
 
-```{r}
-
+```{r comparison, warning=FALSE, message=FALSE}
+plot_grid(
+  autoplot(Acf(seasonal_111011$residuals,lag.max=60,plot=FALSE),main="Seasonal 111011"),
+  autoplot(Acf(nonseasonal_111$residuals,lag.max=60,plot=FALSE),main="Nonseasonal 111"),
+  autoplot(Pacf(seasonal_111011$residuals,lag.max=60,plot=FALSE),main="Seasonal 111011"),
+  autoplot(Pacf(nonseasonal_111$residuals,lag.max=60,plot=FALSE),main="Nonseasonal 111"),
+  nrow=2,ncol=2
+)
 ```
 
+> Answer: Both of the model  seems to present residuals in random nature. The SARIMA model seems to reduce correlation that is outside the blue line. 
 
 ## Checking your model with the auto.arima()
 
@@ -198,8 +343,13 @@ Compare the residual series for Q7 and Q6. Can you tell which ARIMA model is bet
 
 Use the $auto.arima()$ command on the **deseasonalized series** to let R choose the model parameter for you. What's the order of the best ARIMA model? Does it match what you specified in Q4?
 
-```{r}
+```{r auto ARIMA model on deseasoned series, warning=FALSE, message=FALSE}
+# Run the auto ARIMA model on the deseasonalized series
+auto_ARIMA_deseason <- auto.arima(deseason_netgen)
+print(auto_ARIMA_deseason)
 
+# Plot the residuals of the auto ARIMA model on the deseasonalized series
+checkresiduals(auto_ARIMA_deseason)
 ```
 
 
@@ -207,7 +357,23 @@ Use the $auto.arima()$ command on the **deseasonalized series** to let R choose 
 
 Use the $auto.arima()$ command on the **original series** to let R choose the model parameters for you. Does it match what you specified in Q7?
 
-```{r}
+```{r the auto ARIMA model on original series, warning=FALSE, message=FALSE}
+# Run the auto ARIMA model on the deseasonalized series
+auto_ARIMA_original <- auto.arima(ts_netgen)
+print(auto_ARIMA_original)
 
+# Plot the residuals of the auto SARIMA model
+checkresiduals(auto_ARIMA_original)
+
+# Compare AIC 
+seasonal_100011 <- Arima(ts_netgen,
+                       order=c(1,0,0),
+                       seasonal=c(0,1,1),
+                       include.drift=FALSE)
+print(seasonal_100011)
+compare_aic <- data.frame(compare_aic, seasonal_100011$aic)
+
+print(compare_aic)
 ```
 
+> Answer: For the non-seasonal ARIMA model, what I specified in Q7 and what R auto-calculates match. However, for the seasonal ARIMA model, it does not match. I consider that for the non-seasonal part, I don't need to respecify and just focus on the seasonal part, thereby it ends up with SARIMA(111011). When R auto calculates, it produces (100011) model. I consider that the model I specify could also work as it has a low AIC value and the residuals also look random.  
